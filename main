@@ -1,38 +1,34 @@
+from flask import Flask, request, jsonify
 import pandas as pd
+import io
 
-def ejecutar_analisis(ruta_excel):
-    print(f"--- Iniciando procesamiento de: {ruta_excel} ---")
-    
-    # 1. CARGA DE DATOS [cite: 35, 37]
-    df = pd.read_excel(ruta_excel)
-    
-    # 2. PRIVACIDAD BLINDADA (GDPR) [cite: 18, 41]
-    # Eliminamos datos sensibles para proteger el secreto comercial [cite: 18]
-    columnas_a_borrar = ['Nombre', 'Email', 'Telefono', 'Direccion', 'Cliente']
-    df_limpio = df.drop(columns=[c for c in columnas_a_borrar if c in df.columns])
-    
-    # 3. MOTOR DE BIG DATA (Cálculos de métricas reales) [cite: 11, 37]
-    # Nota: Asegúrate de que tu Excel tenga estas columnas
-    ventas_totales = df_limpio['Total'].sum()
-    ticket_medio = df_limpio['Total'].mean()
-    producto_top = df_limpio.groupby('Producto')['Cantidad'].sum().idxmax()
-    
-    # 4. RESULTADO PARA LA IA (Gemini) [cite: 12, 39]
-    resumen = {
-        "ventas_totales": round(ventas_totales, 2),
-        "ticket_medio": round(ticket_medio, 2),
-        "producto_estrella": producto_top,
-        "mensajes_clave": "Datos anonimizados listos para Gemini."
-    }
-    
-    return resumen
+app = Flask(__name__)
 
-# PRUEBA MANUAL
-if __name__ == "__main__":
-    archivo_prueba = 'ventas.xlsx' # Asegúrate que el Excel se llame así
+@app.route('/analizar', methods=['POST'])
+def analizar():
     try:
-        resultado = ejecutar_analisis(archivo_prueba)
-        print("Métricas calculadas con éxito:")
-        print(resultado)
+        # 1. Recibir el archivo desde Make
+        file = request.files['file']
+        df = pd.read_excel(file)
+
+        # 2. Anonimización (GDPR)
+        columnas_a_borrar = ['Nombre', 'Email', 'Telefono', 'Direccion', 'Cliente']
+        df_limpio = df.drop(columns=[c for c in columnas_a_borrar if c in df.columns])
+
+        # 3. Métricas
+        ventas_totales = df_limpio['Total'].sum()
+        ticket_medio = df_limpio['Total'].mean()
+        producto_top = df_limpio.groupby('Producto')['Cantidad'].sum().idxmax()
+
+        # 4. Respuesta a Make
+        return jsonify({
+            "status": "success",
+            "ventas_totales": float(round(ventas_totales, 2)),
+            "ticket_medio": float(round(ticket_medio, 2)),
+            "producto_estrella": str(producto_top)
+        })
     except Exception as e:
-        print(f"Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=10000)
