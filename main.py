@@ -6,9 +6,11 @@ app = Flask(__name__)
 
 @app.route('/analizar', methods=['POST'])
 def analizar():
-    try:
-        # 1. Recibir el archivo desde Make
-        file = request.files['file']
+    # Verificamos si el archivo existe en la petición
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No se encontró el campo 'file'"}), 400
+    
+    file = request.files['file']
         df = pd.read_excel(file)
 
         # 2. Anonimización (GDPR)
